@@ -5,6 +5,7 @@ const path = require('path');
 const readline = require('readline');
 const FILE = path.join(__dirname, 'water.json');
 const DEFAULT_GOAL = 2000;
+const REMIND_MIN = 60; // minutes without a drink before nudging
 
 const c = (n, s) => `\x1b[${n}m${s}\x1b[0m`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -34,10 +35,16 @@ const line = (ml, goal, icon) =>
 // rows 1-2 are pinned (bar + title); everything else scrolls
 const rows = () => process.stdout.rows || 24;
 const setRegion = () => process.stdout.write(`[3;${rows()}r`);
-const pin = (ml, goal, icon) =>
+const pinRaw = (ml, goal, icon) =>
   process.stdout.write(
     `7[1;1H[2K${line(ml, goal, icon)}[2;1H[2K${c(90, `💧 water · ${day} · /help`)}8`
   );
+
+// pin + terminal tab title (OSC 0), e.g. "💧 42% · 1260/3000ml"
+const pin = (ml, goal, icon) => {
+  process.stdout.write(`\x1b]0;💧 ${Math.round((ml / goal) * 100)}% · ${ml}/${goal}ml\x07`);
+  pinRaw(ml, goal, icon);
+};
 
 async function animate(from, to) {
   const { goal } = db[day];
@@ -139,6 +146,15 @@ async function main() {
   console.log();
   await animate(0, total());
   await status();
+
+  // reminder: no drink for REMIND_MIN while under goal -> bell + nudge on pinned row 2 (cleared by next pin)
+  const started = Date.now();
+  setInterval(() => {
+    const { goal, log } = db[day];
+    const last = log.length ? new Date(`${day}T${log[log.length - 1].t}`).getTime() : started;
+    if (total() >= goal || Date.now() - Math.max(last, started) < REMIND_MIN * 60000) return;
+    process.stdout.write(`\x1b]0;💧 time to drink!\x07\x07\x1b7\x1b[2;1H\x1b[2K${c(33, '💧 time to drink! /add 250')}\x1b8`);
+  }, 60000).unref();
 
   for (;;) {
     // a session left open past midnight rolls over to a new day's file entry on restart; keep simple

@@ -12,6 +12,8 @@ water
 
 On the first run of each day it asks for your goal (Enter reuses yesterday's, default 2000ml). A progress bar stays pinned to the top of the terminal while you type commands.
 
+While open, it bells and shows a nudge on the pinned title row if you're under goal and haven't logged water for 60 minutes (`REMIND_MIN` in `water.js`).
+
 ## Commands
 
 | Command | Description |
